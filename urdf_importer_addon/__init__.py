@@ -18,8 +18,8 @@ if "bpy" in locals():
 # fmt: off
 import bpy
 
-from urdf_importer import URDFImporter
-from urdf_importer import FBXExporter
+from .urdf_importer import URDFImporter
+from .urdf_importer import FBXExporter
 # fmt: on
 
 
@@ -46,6 +46,6 @@ def unregister():
     from os.path import exists
     from shutil import rmtree
 
-    from urdf_importer import TMP_FOLDER_PATH
+    from .urdf_importer import TMP_FOLDER_PATH
     if exists(TMP_FOLDER_PATH):
         rmtree(TMP_FOLDER_PATH)
