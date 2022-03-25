@@ -435,7 +435,7 @@ class RobotBuilder:
 
         else:
             self.add_root_mesh_and_bone(
-                root_link.name + ".empty", None, root_link)
+                root_link.name + ".empty", None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
 
         self.parent_links = [root_link]
         return None
