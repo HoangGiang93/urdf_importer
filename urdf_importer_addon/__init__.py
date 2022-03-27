@@ -9,12 +9,6 @@ bl_info = {
     "category": "Import-Export"
 }
 
-if "bpy" in locals():
-    import importlib
-    if "urdf_importer" in locals():
-        importlib.reload(URDFImporter)
-        importlib.reload(FBXExporter)
-
 # fmt: off
 import bpy
 
@@ -28,7 +22,8 @@ def import_menu_func(self, context):
 
 
 def export_menu_func(self, context):
-    self.layout.operator(FBXExporter.bl_idname, text="FBX (.fbx)")
+    self.layout.operator(FBXExporter.bl_idname,
+                         text="FBX with textures (.fbx)")
 
 
 def register():

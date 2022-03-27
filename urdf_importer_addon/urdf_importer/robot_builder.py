@@ -156,11 +156,15 @@ def remove_identical_materials() -> None:
 
         for material_slot in object.material_slots:
             mat = material_slot.material
+            if not hasattr(mat.node_tree, 'nodes'):
+                continue
             mat_base_color = mat.node_tree.nodes['Principled BSDF'].inputs.get(
                 'Base Color')
             is_mat_not_from_file = not mat_base_color.links
             mat_unique: Material
             for mat_unique in mat_uniques:
+                if not hasattr(mat_unique.node_tree, 'nodes'):
+                    break
                 mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
                     'Base Color')
                 if is_mat_not_from_file:
@@ -171,7 +175,6 @@ def remove_identical_materials() -> None:
                     if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
                         object.material_slots[mat.name].material = mat_unique
                         break
-
             if mat not in mat_uniques:
                 mat_uniques.append(mat)
             else:
@@ -183,7 +186,8 @@ def remove_identical_materials() -> None:
 
 def fix_alpha() -> None:
     for mat in bpy.data.materials:
-        mat.node_tree.nodes['Principled BSDF'].inputs['Alpha'].default_value = 1.0
+        if hasattr(mat.node_tree, 'nodes'):
+            mat.node_tree.nodes['Principled BSDF'].inputs['Alpha'].default_value = 1.0
 
 
 def rename_materials(base_name: str) -> None:
@@ -249,15 +253,21 @@ class RobotBuilder:
             if file_path[0] == 'cylinder':
                 bpy.ops.mesh.primitive_cylinder_add(
                     depth=file_path[1], radius=file_path[2], scale=(1, 1, 1))
-                object = bpy.context.object
             elif file_path[0] == 'cube':
                 bpy.ops.mesh.primitive_cube_add(
                     size=1, scale=file_path[1])
-                object = bpy.context.object
             elif file_path[0] == 'sphere':
                 bpy.ops.mesh.primitive_uv_sphere_add(
                     radius=file_path[1], scale=(1, 1, 1))
-                object = bpy.context.object
+            else:
+                print('Object type', file_path[0], 'is not supported')
+                return None
+            object = bpy.context.object
+            mat = bpy.data.materials.get("Material")
+            if mat is None:
+                mat = bpy.data.materials.new(name="Material")
+            object.data.materials.append(mat)
+
         elif file_path:
             file_ext = os.path.splitext(file_path)[1].lower()
             if file_ext == '.dae':
@@ -267,7 +277,7 @@ class RobotBuilder:
                 bpy.ops.import_mesh.stl(filepath=file_path)
             else:
                 print('File extension', file_ext, 'of',
-                      file_path, ' is not supported')
+                      file_path, 'is not supported')
                 return None
             camera: Camera
             for camera in bpy.data.cameras:

@@ -20,7 +20,7 @@ def write_data(filepath):
 class FBXExporter(bpy.types.Operator, ExportHelper):
     """Write a FBX file with textures"""
     bl_idname = "export_scene.fbx_with_textures"
-    bl_label = "Export FBX"
+    bl_label = "Export FBX with textures"
 
     # ExportHelper mixin class uses this
     filename_ext = ".fbx"
