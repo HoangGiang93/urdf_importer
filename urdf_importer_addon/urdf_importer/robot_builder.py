@@ -149,37 +149,47 @@ def clear_data(data: BlendData) -> None:
     return None
 
 
-def remove_identical_materials(name: str) -> None:
+def remove_identical_materials() -> None:
     mat_uniques: List[Material] = []
-    i: int = 0
     object: Object
     for object in bpy.data.objects:
-        material_slot: MaterialSlot
+
         for material_slot in object.material_slots:
             mat = material_slot.material
-            add = True
-
+            mat_base_color = mat.node_tree.nodes['Principled BSDF'].inputs.get(
+                'Base Color')
+            is_mat_not_from_file = not mat_base_color.links
             mat_unique: Material
             for mat_unique in mat_uniques:
-                add = False
-                mat_bsdf = mat.node_tree.nodes['Principled BSDF'].inputs
-                mat_unique_bsdf = mat_unique.node_tree.nodes['Principled BSDF'].inputs
-                for input in zip(mat_bsdf, mat_unique_bsdf):
-                    if input[0].default_value != input[1].default_value or Vector(input[0].default_value) != Vector(input[1].default_value):
-                        add = True
+                mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
+                    'Base Color')
+                if is_mat_not_from_file:
+                    if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value]:
+                        object.material_slots[mat.name].material = mat_unique
                         break
-                if add:
-                    break
+                else:
+                    if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
+                        object.material_slots[mat.name].material = mat_unique
+                        break
 
-            if add:
-                mat.name = 'M_' + name + "_" + str(i)
-                i += 1
+            if mat not in mat_uniques:
                 mat_uniques.append(mat)
             else:
-                object.material_slots[mat.name].material = mat_unique
                 bpy.data.materials.remove(mat)
 
         object.select_set(False)
+    return None
+
+
+def fix_alpha() -> None:
+    for mat in bpy.data.materials:
+        mat.node_tree.nodes['Principled BSDF'].inputs['Alpha'].default_value = 1.0
+
+
+def rename_materials(base_name: str) -> None:
+    for object in bpy.data.objects:
+        for material_slot in object.material_slots:
+            material_slot.material.name = 'M_' + base_name
     return None
 
 
@@ -202,10 +212,11 @@ class RobotBuilder:
         self.add_root_armature()
         self.build_root()
         self.build_chain()
+        fix_alpha()
+        remove_identical_materials()
         robot_name = os.path.basename(os.path.splitext(file_path)[0])
-        for mat in bpy.data.materials:
-            mat.node_tree.nodes['Principled BSDF'].inputs['Alpha'].default_value = 1.0
-        remove_identical_materials(robot_name)
+        rename_materials(robot_name)
+
         return None
 
     def konfigure_mesh_path(self) -> None:
@@ -328,8 +339,7 @@ class RobotBuilder:
 
         if hasattr(visual.geometry, 'filename') and visual.geometry.filename:
             file_path = visual.geometry.filename
-            mesh_name = link.name + "." + \
-                os.path.basename(file_path)
+            mesh_name = link.name + "." + os.path.basename(file_path)
         else:
             if hasattr(visual.geometry, 'length') and hasattr(visual.geometry, 'radius'):
                 file_path = [
