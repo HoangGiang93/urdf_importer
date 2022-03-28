@@ -201,7 +201,6 @@ class RobotBuilder:
     def __init__(self, file_path: str):
         xml_string = urdf_cleanup(file_path)
         self.robot = URDF.from_xml_string(xml_string)
-        print(self.robot)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
         self.arm_bones: Dict[str, Bone] = {}
         self.root: Object = None
