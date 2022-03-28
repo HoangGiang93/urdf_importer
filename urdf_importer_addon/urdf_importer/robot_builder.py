@@ -22,10 +22,10 @@ def urdf_cleanup(file_path: str) -> str:
     root = tree.getroot()
 
     newroot = ElementTree.Element(root.tag)
-    newroot.set("name", root.get("name"))
+    newroot.set('name', root.get('name'))
 
     for element in root:
-        if element.tag == "link" or element.tag == "joint":
+        if element.tag == 'link' or element.tag == 'joint' or element.tag == 'material':
             newroot.append(element)
 
     return ElementTree.tostring(newroot)
@@ -96,7 +96,7 @@ def fix_up_axis_and_get_materials(file_path: str):
                             tmp_file_path = TMP_FILE_PATH
                             file_name, file_ext = os.path.splitext(ele3.text)
                             file_hash = str(abs(hash(file_path)) % (10 ** 3))
-                            file = 'T_' + file_name + "_" + file_hash + file_ext
+                            file = 'T_' + file_name + '_' + file_hash + file_ext
                             copy(dir_path + '/' + ele3.text,
                                  TMP_TEXTURE_PATH + file)
                             ele3.text = TMP_TEXTURE_PATH + file
@@ -201,6 +201,7 @@ class RobotBuilder:
     def __init__(self, file_path: str):
         xml_string = urdf_cleanup(file_path)
         self.robot = URDF.from_xml_string(xml_string)
+        print(self.robot)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
         self.arm_bones: Dict[str, Bone] = {}
         self.root: Object = None
@@ -212,6 +213,7 @@ class RobotBuilder:
 
     def build_robot(self, file_path) -> None:
         clear_data(bpy.data)
+        self.create_materials()
         self.konfigure_mesh_path()
         self.add_root_armature()
         self.build_root()
@@ -220,7 +222,16 @@ class RobotBuilder:
         remove_identical_materials()
         robot_name = os.path.basename(os.path.splitext(file_path)[0])
         rename_materials(robot_name)
+        return None
 
+    def create_materials(self) -> None:
+        for material in self.robot.materials:
+            if material.color is not None and hasattr(material.color, 'rgba'):
+                if bpy.data.materials.get(material.name):
+                    print('Material', material.name, 'already exists')
+                else:
+                    mat: Material = bpy.data.materials.new(name=material.name)
+                    mat.diffuse_color = material.color.rgba
         return None
 
     def konfigure_mesh_path(self) -> None:
@@ -235,7 +246,7 @@ class RobotBuilder:
                     pkg_name = os.path.basename(rel_path)
                     pkg_path = rospkg.RosPack().get_path(pkg_name)
                     abs_path = os.path.dirname(
-                        pkg_path) + visual.geometry.filename.replace("package://", "/")
+                        pkg_path) + visual.geometry.filename.replace('package://', '/')
                     if os.path.exists(abs_path):
                         visual.geometry.filename = abs_path
         return None
@@ -248,7 +259,7 @@ class RobotBuilder:
         bpy.context.scene.collection.objects.link(self.root)
         return None
 
-    def add_mesh(self, mesh_name: str, file_path: Union[str, List[str]] = '', location=Vector(), rotation=Euler(), scale=Vector((1, 1, 1)), origin_pos=Vector(), origin_rot=Euler()) -> None:
+    def add_mesh(self, mesh_name: str, material: Material = None, file_path: Union[str, List[str]] = '', location=Vector(), rotation=Euler(), scale=Vector((1, 1, 1)), origin_pos=Vector(), origin_rot=Euler()) -> None:
         if isinstance(file_path, list):
             if file_path[0] == 'cylinder':
                 bpy.ops.mesh.primitive_cylinder_add(
@@ -263,10 +274,11 @@ class RobotBuilder:
                 print('Object type', file_path[0], 'is not supported')
                 return None
             object = bpy.context.object
-            mat = bpy.data.materials.get("Material")
-            if mat is None:
-                mat = bpy.data.materials.new(name="Material")
-            object.data.materials.append(mat)
+            if material is None:
+                material = bpy.data.materials.get('Material')
+                if material is None:
+                    material = bpy.data.materials.new(name='Material')
+            object.data.materials.append(material)
 
         elif file_path:
             file_ext = os.path.splitext(file_path)[1].lower()
@@ -289,6 +301,7 @@ class RobotBuilder:
             if not bpy.context.object.data.uv_layers:
                 bpy.ops.mesh.uv_texture_add()
             object = bpy.context.object
+
         else:
             mesh = bpy.data.meshes.new(mesh_name)
             mesh.uv_layers.new()
@@ -349,7 +362,7 @@ class RobotBuilder:
 
         if hasattr(visual.geometry, 'filename') and visual.geometry.filename:
             file_path = visual.geometry.filename
-            mesh_name = link.name + "." + os.path.basename(file_path)
+            mesh_name = link.name + '.' + os.path.basename(file_path)
         else:
             if hasattr(visual.geometry, 'length') and hasattr(visual.geometry, 'radius'):
                 file_path = [
@@ -372,7 +385,14 @@ class RobotBuilder:
         else:
             scale = Vector((1, 1, 1))
 
-        return (mesh_name, file_path, visual_pos, visual_rot, scale)
+        if hasattr(visual, 'material') and hasattr(visual.material, 'name'):
+            material = bpy.data.materials.get(visual.material.name)
+            if material is None:
+                material = bpy.data.materials.new(visual.material.name)
+        else:
+            material = None
+
+        return (mesh_name, file_path, visual_pos, visual_rot, scale, material)
 
     def bind_mesh_to_bone(self, mesh_name: str, bone_name: str) -> None:
         bpy.ops.object.mode_set(mode='POSE')
@@ -416,16 +436,16 @@ class RobotBuilder:
         bpy.ops.object.mode_set(mode='OBJECT')
         return None
 
-    def add_root_mesh_and_bone(self, mesh_name: str, file_path: Union[str, List[str]], link: Link, pos: Vector, rot: Euler, scale: Vector = Vector((1, 1, 1))) -> None:
-        self.add_mesh(mesh_name, file_path, pos, rot, scale,
+    def add_root_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, pos: Vector, rot: Euler, scale: Vector = Vector((1, 1, 1))) -> None:
+        self.add_mesh(mesh_name, material, file_path, pos, rot, scale,
                       self.link_pose[link.name][0], self.link_pose[link.name][1])
         self.add_root_bone(link.name)
         self.bind_mesh_to_bone(
             mesh_name, self.root_name + self.bone_tail)
         return None
 
-    def add_mesh_and_bone(self, mesh_name: str, file_path: Union[str, List[str]], link: Link, joint: Joint, pos: Vector, rot: Euler, scale=Vector((1, 1, 1))) -> None:
-        self.add_mesh(mesh_name, file_path, pos, rot, scale,
+    def add_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, joint: Joint, pos: Vector, rot: Euler, scale=Vector((1, 1, 1))) -> None:
+        self.add_mesh(mesh_name, material, file_path, pos, rot, scale,
                       self.link_pose[link.name][0], self.link_pose[link.name][1])
         self.add_bone(link, joint, pos, rot)
         self.bind_mesh_to_bone(mesh_name, joint.name + self.bone_tail)
@@ -439,7 +459,7 @@ class RobotBuilder:
         if root_link.visuals:
             visual: Visual
             for visual in root_link.visuals:
-                mesh_name, file_path, visual_pos, visual_rot, scale = self.get_link_data(
+                mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                     self.link_pose[root_link.name][0], self.link_pose[root_link.name][1], root_link, visual)
 
                 pos_tmp = self.link_pose[root_link.name][0].copy()
@@ -451,11 +471,11 @@ class RobotBuilder:
                 visual_rot = rot_tmp
 
                 self.add_root_mesh_and_bone(
-                    mesh_name, file_path, root_link, visual_pos, visual_rot, scale)
+                    mesh_name, material, file_path, root_link, visual_pos, visual_rot, scale)
 
         else:
             self.add_root_mesh_and_bone(
-                root_link.name + ".empty", None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
+                root_link.name + '.empty', material, None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
 
         self.parent_links = [root_link]
         return None
@@ -490,15 +510,15 @@ class RobotBuilder:
                         if child_link.visuals:
                             visual: Visual
                             for visual in child_link.visuals:
-                                mesh_name, file_path, visual_pos, visual_rot, scale = self.get_link_data(
+                                mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                                     child_pos, child_rot, child_link, visual)
 
                                 self.add_mesh_and_bone(
-                                    mesh_name, file_path, child_link, child_joint, visual_pos, visual_rot, scale)
+                                    mesh_name, material, file_path, child_link, child_joint, visual_pos, visual_rot, scale)
 
                         else:
                             self.add_mesh_and_bone(
-                                child_link.name + ".empty", None, child_link, child_joint, child_pos, child_rot)
+                                child_link.name + '.empty', material, None, child_link, child_joint, child_pos, child_rot)
 
                         self.parent_links.append(child_link)
 
