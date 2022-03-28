@@ -1,6 +1,12 @@
 # urdf_importer
 URDF Importer is an add-on for [Blender](https://www.blender.org/). It supports for importing robots from URDF format from ROS Packages and provides FBX Exporter with textures for further usage.
 
+## Features
+- Import robot from URDF format from ROS environment to Blender (please source the package first)
+- Auto generate meshes, armatures and bones based on the URDF
+- Remove duplicated materials
+- Export robot to .fbx format with textures
+
 ## Prerequisite
 - [Blender 3.1.x](https://www.blender.org/download/releases/3-1/)
 - [ROS or ROS2](https://www.ros.org/)
