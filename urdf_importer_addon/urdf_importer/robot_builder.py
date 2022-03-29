@@ -200,12 +200,13 @@ def rename_materials(base_name: str) -> None:
 class RobotBuilder:
     def __init__(self, file_path: str):
         xml_string = urdf_cleanup(file_path)
-        self.robot = URDF.from_xml_string(xml_string)
+        self.robot: URDF = URDF.from_xml_string(xml_string)
+        print(self.robot)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
         self.arm_bones: Dict[str, Bone] = {}
         self.root: Object = None
         self.root_name = 'root'
-        self.bone_tail = '_bone'
+        self.bone_tail = '.bone'
         self.parent_links = None
         self.build_robot(file_path)
         clean_up()
@@ -329,7 +330,7 @@ class RobotBuilder:
             self.link_pose[link.name][1].rotate(Euler(link.origin.rpy))
         return None
 
-    def add_root_bone(self, link_name: str) -> None:
+    def add_root_bone(self, link_name: str, bone_name: str) -> None:
         bpy.context.view_layer.objects.active = self.root
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
@@ -337,8 +338,7 @@ class RobotBuilder:
         tail = Vector((0.0, 0.1, 0.0))
         tail.rotate(self.link_pose[link_name][1])
         tail += head
-        bone: Bone = self.root.data.edit_bones.new(
-            self.root_name + self.bone_tail)
+        bone: Bone = self.root.data.edit_bones.new(bone_name)
         bone.head = head
         bone.tail = tail
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -407,7 +407,7 @@ class RobotBuilder:
         bpy.ops.object.mode_set(mode='OBJECT')
         return None
 
-    def add_bone(self, link: Link, joint: Joint, pos: Vector, rot: Euler) -> None:
+    def add_bone(self, link: Link, joint: Joint, pos: Vector, rot: Euler, bone_name: str) -> None:
         bpy.context.view_layer.objects.active = self.root
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
@@ -421,16 +421,16 @@ class RobotBuilder:
             tail.rotate(rot)
 
         tail += head
-        bone: Bone = self.root.data.edit_bones.new(
-            joint.name + self.bone_tail)
+        bone: Bone = self.root.data.edit_bones.new(bone_name)
         bone.head = head
         bone.tail = tail
-
+        
         if self.robot.parent_map[link.name][1] == self.robot.get_root():
-            bone.parent = self.root.data.edit_bones['root_bone']
+            bone.parent = self.root.data.edit_bones['root' + self.bone_tail]
         else:
-            bone.parent = self.root.data.edit_bones[self.robot.parent_map[
-                self.robot.parent_map[link.name][1]][0] + self.bone_tail]
+            parent_joint = self.robot.parent_map[self.robot.parent_map[link.name][1]][0]
+            parent_joint_name = parent_joint + '.' + str(self.robot.joint_map[parent_joint].type) + self.bone_tail
+            bone.parent = self.root.data.edit_bones[parent_joint_name]
 
         bpy.ops.object.mode_set(mode='OBJECT')
         return None
@@ -438,16 +438,18 @@ class RobotBuilder:
     def add_root_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, pos: Vector, rot: Euler, scale: Vector = Vector((1, 1, 1))) -> None:
         self.add_mesh(mesh_name, material, file_path, pos, rot, scale,
                       self.link_pose[link.name][0], self.link_pose[link.name][1])
-        self.add_root_bone(link.name)
+        bone_name = self.root_name + self.bone_tail
+        self.add_root_bone(link.name, bone_name)
         self.bind_mesh_to_bone(
-            mesh_name, self.root_name + self.bone_tail)
+            mesh_name, bone_name)
         return None
 
     def add_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, joint: Joint, pos: Vector, rot: Euler, scale=Vector((1, 1, 1))) -> None:
         self.add_mesh(mesh_name, material, file_path, pos, rot, scale,
                       self.link_pose[link.name][0], self.link_pose[link.name][1])
-        self.add_bone(link, joint, pos, rot)
-        self.bind_mesh_to_bone(mesh_name, joint.name + self.bone_tail)
+        bone_name = joint.name + '.' + str(joint.type) + self.bone_tail
+        self.add_bone(link, joint, pos, rot, bone_name)
+        self.bind_mesh_to_bone(mesh_name, bone_name)
         return None
 
     def build_root(self) -> None:

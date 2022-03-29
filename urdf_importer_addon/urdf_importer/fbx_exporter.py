@@ -11,7 +11,7 @@ import os
 
 def write_data(filepath):
     bpy.ops.export_scene.fbx(filepath=filepath, object_types={
-                             'ARMATURE', 'MESH'}, mesh_smooth_type='FACE')
+                             'ARMATURE', 'MESH'}, mesh_smooth_type='FACE', add_leaf_bones=False)
     copytree(TMP_TEXTURE_PATH, os.path.dirname(
         filepath) + '/' + TMP_TEXTURE_PATH, dirs_exist_ok=True)
     return {'FINISHED'}
