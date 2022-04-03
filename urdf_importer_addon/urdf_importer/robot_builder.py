@@ -201,7 +201,6 @@ class RobotBuilder:
     def __init__(self, file_path: str):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
-        print(self.robot)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
         self.arm_bones: Dict[str, Bone] = {}
         self.root: Object = None
@@ -361,7 +360,10 @@ class RobotBuilder:
 
         if hasattr(visual.geometry, 'filename') and visual.geometry.filename:
             file_path = visual.geometry.filename
-            mesh_name = link.name + '.' + os.path.basename(file_path)
+            mesh_name: str = link.name + '.' + os.path.basename(file_path)
+            if len(mesh_name) > 63:
+                print('Mesh', mesh_name, 'has more than 63 characters, the characters from 64 will be ignored')
+                mesh_name = mesh_name[0:63]
         else:
             if hasattr(visual.geometry, 'length') and hasattr(visual.geometry, 'radius'):
                 file_path = [
