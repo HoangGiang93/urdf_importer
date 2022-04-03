@@ -415,10 +415,11 @@ class RobotBuilder:
 
         head = pos
         tail = Vector((0.0, 0.1, 0.0))
-        tail.rotate(rot)
-
+        
         if hasattr(joint, 'axis') and joint.axis is not None:
             tail.rotate(Vector((0.0, 0.0, 1.0)).rotation_difference(Vector(joint.axis)))
+
+        tail.rotate(rot)
 
         tail += head
         bone: Bone = self.root.data.edit_bones.new(bone_name)
