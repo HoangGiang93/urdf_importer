@@ -418,9 +418,7 @@ class RobotBuilder:
         tail.rotate(rot)
 
         if hasattr(joint, 'axis') and joint.axis is not None:
-            rot = Vector((0.0, 0.0, 1.0)).rotation_difference(
-                Vector(joint.axis))
-            tail.rotate(rot)
+            tail.rotate(Vector((0.0, 0.0, 1.0)).rotation_difference(Vector(joint.axis)))
 
         tail += head
         bone: Bone = self.root.data.edit_bones.new(bone_name)
@@ -446,11 +444,11 @@ class RobotBuilder:
             mesh_name, bone_name)
         return None
 
-    def add_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, joint: Joint, pos: Vector, rot: Euler, scale=Vector((1, 1, 1))) -> None:
-        self.add_mesh(mesh_name, material, file_path, pos, rot, scale,
+    def add_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, joint: Joint, visual_pos: Vector, visual_rot: Euler, joint_pos: Vector, joint_rot: Euler, scale=Vector((1, 1, 1))) -> None:
+        self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot, scale,
                       self.link_pose[link.name][0], self.link_pose[link.name][1])
         bone_name = joint.name + '.' + str(joint.type) + self.bone_tail
-        self.add_bone(link, joint, pos, rot, bone_name)
+        self.add_bone(link, joint, joint_pos, joint_rot, bone_name)
         self.bind_mesh_to_bone(mesh_name, bone_name)
         return None
 
@@ -502,6 +500,8 @@ class RobotBuilder:
                         child_joint = self.robot.joint_map[child_map[0]]
                         child_pos, child_rot = self.add_link_origin(
                             child_pos, child_rot, child_joint)
+                        joint_pos = child_pos.copy()
+                        joint_rot = child_rot.copy()
 
                         child_link = self.robot.link_map[child_map[1]]
                         child_pos, child_rot = self.add_link_origin(
@@ -517,11 +517,11 @@ class RobotBuilder:
                                     child_pos, child_rot, child_link, visual)
 
                                 self.add_mesh_and_bone(
-                                    mesh_name, material, file_path, child_link, child_joint, visual_pos, visual_rot, scale)
+                                    mesh_name, material, file_path, child_link, child_joint, visual_pos, visual_rot, joint_pos, joint_rot, scale)
 
                         else:
                             self.add_mesh_and_bone(
-                                child_link.name + '.empty', material, None, child_link, child_joint, child_pos, child_rot)
+                                child_link.name + '.empty', material, None, child_link, child_joint, child_pos, child_rot, joint_pos, joint_rot)
 
                         self.parent_links.append(child_link)
 
