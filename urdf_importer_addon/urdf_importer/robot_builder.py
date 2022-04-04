@@ -98,7 +98,6 @@ def fix_up_axis_and_get_materials(file_path: str):
                             file_name, file_ext = os.path.splitext(ele3.text)
                             file_hash = str(abs(hash(file_path)) % (10 ** 3))
                             file = 'T_' + file_name + '_' + file_hash + file_ext
-                            print(file_path)
                             copy(dir_path + '/' + ele3.text,
                                  TMP_TEXTURE_PATH + file)
                             ele3.text = TMP_TEXTURE_PATH + file
