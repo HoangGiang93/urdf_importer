@@ -9,7 +9,8 @@ import bpy
 import rospkg
 from bpy.types import (Armature, BlendData, Bone, Camera, Image, Light,
                        Material, MaterialSlot, Mesh, Object)
-from mathutils import Euler, Vector
+from math import pi
+from mathutils import Euler, Vector, Matrix
 from urdf_parser_py.urdf import URDF, Joint, Link, Visual
 
 TMP_FOLDER_PATH = 'texture/'
@@ -258,7 +259,7 @@ class RobotBuilder:
         bpy.context.scene.collection.objects.link(self.root)
         return None
 
-    def add_mesh(self, mesh_name: str, material: Material = None, file_path: Union[str, List[str]] = '', location=Vector(), rotation=Euler(), scale=Vector((1, 1, 1)), origin_pos=Vector(), origin_rot=Euler()) -> None:
+    def add_mesh(self, mesh_name: str, material: Material = None, file_path: Union[str, List[str]] = '', location=Vector(), rotation=Euler(), scale=Vector((1, 1, 1)), link_pos=Vector(), link_rot=Euler()) -> None:
         if isinstance(file_path, list):
             if file_path[0] == 'cylinder':
                 bpy.ops.mesh.primitive_cylinder_add(
@@ -309,15 +310,14 @@ class RobotBuilder:
 
         object.name = mesh_name
         object.rotation_mode = 'XYZ'
-        rot_tmp = rotation
-        rot_tmp.rotate(object.rotation_euler)
         object.rotation_euler.rotate(rotation)
         object.location.rotate(rotation)
         object.location += location
         object.scale *= scale
 
-        bpy.context.scene.cursor.location = origin_pos
-        bpy.context.scene.cursor.rotation_euler = origin_rot
+        # Change origin of mesh to link_pos and link_rot
+        bpy.context.scene.cursor.location = link_pos
+        bpy.context.scene.cursor.rotation_euler = link_rot
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         bpy.context.scene.cursor.location = Vector()
         bpy.context.scene.cursor.rotation_euler = Euler()
@@ -409,23 +409,26 @@ class RobotBuilder:
         bpy.ops.object.mode_set(mode='OBJECT')
         return None
 
-    def add_bone(self, link: Link, joint: Joint, pos: Vector, rot: Euler, bone_name: str) -> None:
+    def add_bone(self, link: Link, joint: Joint, joint_pos: Vector, joint_rot: Euler, bone_name: str) -> None:
         bpy.context.view_layer.objects.active = self.root
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
-        head = pos
-        tail = Vector((0.0, 0.1, 0.0))
+        head = joint_pos
+        tail = Vector((0.0, 0.0, 0.1))
         
-        if hasattr(joint, 'axis') and joint.axis is not None:
-            tail.rotate(Vector((0.0, 0.0, 1.0)).rotation_difference(Vector(joint.axis)))
+        if hasattr(joint, 'axis') and joint.axis is not None and Vector(joint.axis).magnitude != 0:
+            tail = Vector(joint.axis).normalized() * 0.1
 
-        tail.rotate(rot)
-
+        tail.rotate(joint_rot)
+        tail_rot = Vector((1.0, 0.0, 0.0))
+        tail_rot.rotate(joint_rot)
+        tail.rotate(Matrix.Rotation(-pi/2, 3, tail_rot))
         tail += head
+
         bone: Bone = self.root.data.edit_bones.new(bone_name)
         bone.head = head
         bone.tail = tail
-        
+
         if self.robot.parent_map[link.name][1] == self.robot.get_root():
             bone.parent = self.root.data.edit_bones['root' + self.bone_tail]
         else:
@@ -477,7 +480,7 @@ class RobotBuilder:
 
         else:
             self.add_root_mesh_and_bone(
-                root_link.name + '.empty', material, None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
+                root_link.name + '.empty', None, None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
 
         self.parent_links = [root_link]
         return None
@@ -522,7 +525,7 @@ class RobotBuilder:
 
                         else:
                             self.add_mesh_and_bone(
-                                child_link.name + '.empty', material, None, child_link, child_joint, child_pos, child_rot, joint_pos, joint_rot)
+                                child_link.name + '.empty', None, None, child_link, child_joint, child_pos, child_rot, joint_pos, joint_rot)
 
                         self.parent_links.append(child_link)
 
