@@ -98,6 +98,7 @@ def fix_up_axis_and_get_materials(file_path: str):
                             file_name, file_ext = os.path.splitext(ele3.text)
                             file_hash = str(abs(hash(file_path)) % (10 ** 3))
                             file = 'T_' + file_name + '_' + file_hash + file_ext
+                            print(file_path)
                             copy(dir_path + '/' + ele3.text,
                                  TMP_TEXTURE_PATH + file)
                             ele3.text = TMP_TEXTURE_PATH + file
@@ -418,17 +419,13 @@ class RobotBuilder:
         
         if hasattr(joint, 'axis') and joint.axis is not None and Vector(joint.axis).magnitude != 0:
             tail = Vector(joint.axis).normalized() * 0.1
-
+        
         tail.rotate(joint_rot)
-        tail_rot = Vector((1.0, 0.0, 0.0))
-        tail_rot.rotate(joint_rot)
-        tail.rotate(Matrix.Rotation(-pi/2, 3, tail_rot))
-        tail += head
 
         bone: Bone = self.root.data.edit_bones.new(bone_name)
         bone.head = head
-        bone.tail = tail
-
+        bone.tail = head + tail
+        
         if self.robot.parent_map[link.name][1] == self.robot.get_root():
             bone.parent = self.root.data.edit_bones['root' + self.bone_tail]
         else:
