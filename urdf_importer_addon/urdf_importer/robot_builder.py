@@ -226,6 +226,7 @@ class RobotBuilder:
 
     def create_materials(self) -> None:
         for material in self.robot.materials:
+
             if material.color is not None and hasattr(material.color, 'rgba'):
                 if bpy.data.materials.get(material.name):
                     print('Material', material.name, 'already exists')
@@ -278,6 +279,7 @@ class RobotBuilder:
                 material = bpy.data.materials.get('Material')
                 if material is None:
                     material = bpy.data.materials.new(name='Material')
+
             object.data.materials.append(material)
 
         elif file_path:
@@ -301,6 +303,8 @@ class RobotBuilder:
             if not bpy.context.object.data.uv_layers:
                 bpy.ops.mesh.uv_texture_add()
             object = bpy.context.object
+            if material is not None:
+                object.data.materials.append(material)
 
         else:
             mesh = bpy.data.meshes.new(mesh_name)
@@ -362,7 +366,8 @@ class RobotBuilder:
             file_path = visual.geometry.filename
             mesh_name: str = link.name + '.' + os.path.basename(file_path)
             if len(mesh_name) > 63:
-                print('Mesh', mesh_name, 'has more than 63 characters, the characters from 64 will be ignored')
+                print('Mesh', mesh_name,
+                      'has more than 63 characters, the characters from 64 will be ignored')
                 mesh_name = mesh_name[0:63]
         else:
             if hasattr(visual.geometry, 'length') and hasattr(visual.geometry, 'radius'):
@@ -415,21 +420,22 @@ class RobotBuilder:
 
         head = joint_pos
         tail = Vector((0.0, 0.0, 0.1))
-        
+
         if hasattr(joint, 'axis') and joint.axis is not None and Vector(joint.axis).magnitude != 0:
             tail = Vector(joint.axis).normalized() * 0.1
-        
+
         tail.rotate(joint_rot)
 
         bone: Bone = self.root.data.edit_bones.new(bone_name)
         bone.head = head
         bone.tail = head + tail
-        
+
         if self.robot.parent_map[link.name][1] == self.robot.get_root():
             bone.parent = self.root.data.edit_bones['root' + self.bone_tail]
         else:
             parent_joint = self.robot.parent_map[self.robot.parent_map[link.name][1]][0]
-            parent_joint_name = parent_joint + '.' + str(self.robot.joint_map[parent_joint].type) + self.bone_tail
+            parent_joint_name = parent_joint + '.' + \
+                str(self.robot.joint_map[parent_joint].type) + self.bone_tail
             bone.parent = self.root.data.edit_bones[parent_joint_name]
 
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -515,7 +521,6 @@ class RobotBuilder:
                             for visual in child_link.visuals:
                                 mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                                     child_pos, child_rot, child_link, visual)
-
                                 self.add_mesh_and_bone(
                                     mesh_name, material, file_path, child_link, child_joint, visual_pos, visual_rot, joint_pos, joint_rot, scale)
 
