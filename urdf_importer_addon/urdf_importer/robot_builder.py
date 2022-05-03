@@ -8,9 +8,8 @@ from xml.etree import ElementTree
 import bpy
 import rospkg
 from bpy.types import (Armature, BlendData, Bone, Camera, Image, Light,
-                       Material, MaterialSlot, Mesh, Object)
-from math import pi
-from mathutils import Euler, Vector, Matrix
+                       Material, Mesh, Object)
+from mathutils import Euler, Vector
 from urdf_parser_py.urdf import URDF, Joint, Link, Visual
 
 TMP_FOLDER_PATH = 'texture/'
@@ -99,7 +98,7 @@ def fix_up_axis_and_get_materials(file_path: str):
                             file_hash = str(abs(hash(file_path)) % (10 ** 3))
                             file = 'T_' + file_name + '_' + file_hash + file_ext
                             copy(dir_path + '/' + ele3.text,
-                                 TMP_TEXTURE_PATH + file)
+                                TMP_TEXTURE_PATH + file)
                             ele3.text = TMP_TEXTURE_PATH + file
                             image_dict[image_name] = ele3.text
 
@@ -177,7 +176,8 @@ def remove_identical_materials() -> None:
                         object.material_slots[mat.name].material = mat_unique
                         break
             if mat not in mat_uniques:
-                mat_uniques.append(mat)
+                if len(mat_base_color.links) > 0:
+                    mat_uniques.append(mat)
             else:
                 bpy.data.materials.remove(mat)
 
@@ -226,7 +226,6 @@ class RobotBuilder:
 
     def create_materials(self) -> None:
         for material in self.robot.materials:
-
             if material.color is not None and hasattr(material.color, 'rgba'):
                 if bpy.data.materials.get(material.name):
                     print('Material', material.name, 'already exists')
@@ -275,11 +274,11 @@ class RobotBuilder:
                 print('Object type', file_path[0], 'is not supported')
                 return None
             object = bpy.context.object
+            
             if material is None:
                 material = bpy.data.materials.get('Material')
                 if material is None:
                     material = bpy.data.materials.new(name='Material')
-
             object.data.materials.append(material)
 
         elif file_path:
@@ -420,10 +419,8 @@ class RobotBuilder:
 
         head = joint_pos
         tail = Vector((0.0, 0.0, 0.1))
-
         if hasattr(joint, 'axis') and joint.axis is not None and Vector(joint.axis).magnitude != 0:
             tail = Vector(joint.axis).normalized() * 0.1
-
         tail.rotate(joint_rot)
 
         bone: Bone = self.root.data.edit_bones.new(bone_name)
@@ -521,6 +518,7 @@ class RobotBuilder:
                             for visual in child_link.visuals:
                                 mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                                     child_pos, child_rot, child_link, visual)
+
                                 self.add_mesh_and_bone(
                                     mesh_name, material, file_path, child_link, child_joint, visual_pos, visual_rot, joint_pos, joint_rot, scale)
 
