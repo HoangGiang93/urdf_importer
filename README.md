@@ -23,7 +23,7 @@ cd <blender_path>/<version>/python/bin/ # For example cd blender-3.1.2-linux-x64
 ```
 
 2. Install add-on
-3. 
+
 https://user-images.githubusercontent.com/64316740/160031703-74b12638-89e8-4aed-a1c0-4ce39fa56783.mp4
 
 
