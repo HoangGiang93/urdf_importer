@@ -13,6 +13,17 @@ URDF Importer is an add-on for [Blender](https://www.blender.org/). It supports 
 
 ## Installation
 
+1. Setup python enviroment
+```
+cd <blender_path>/<version>/python/bin/ # For example cd blender-3.1.2-linux-x64/3.1/python/bin/
+./python3.10 -m ensurepip
+./python3.10 -m pip install --upgrade pip
+./python3.10 -m pip install rospkg
+./python3.10 -m pip install urdf_parser_py
+```
+
+2. Install add-on
+
 https://user-images.githubusercontent.com/64316740/160031703-74b12638-89e8-4aed-a1c0-4ce39fa56783.mp4
 
 
