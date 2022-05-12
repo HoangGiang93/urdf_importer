@@ -98,7 +98,7 @@ def fix_up_axis_and_get_materials(file_path: str):
                             file_hash = str(abs(hash(file_path)) % (10 ** 3))
                             file = 'T_' + file_name + '_' + file_hash + file_ext
                             copy(dir_path + '/' + ele3.text,
-                                TMP_TEXTURE_PATH + file)
+                                 TMP_TEXTURE_PATH + file)
                             ele3.text = TMP_TEXTURE_PATH + file
                             image_dict[image_name] = ele3.text
 
@@ -156,14 +156,20 @@ def remove_identical_materials() -> None:
 
         for material_slot in object.material_slots:
             mat = material_slot.material
-            if not hasattr(mat.node_tree, 'nodes'):
+            try:
+                if not hasattr(mat.node_tree, 'nodes'):
+                    continue
+            except (ReferenceError, AttributeError):
                 continue
             mat_base_color = mat.node_tree.nodes['Principled BSDF'].inputs.get(
                 'Base Color')
             is_mat_not_from_file = not mat_base_color.links
             mat_unique: Material
             for mat_unique in mat_uniques:
-                if not hasattr(mat_unique.node_tree, 'nodes'):
+                try:
+                    if not hasattr(mat_unique.node_tree, 'nodes'):
+                        break
+                except ReferenceError:
                     break
                 mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
                     'Base Color')
@@ -172,12 +178,11 @@ def remove_identical_materials() -> None:
                         object.material_slots[mat.name].material = mat_unique
                         break
                 else:
-                    if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
+                    if mat_unique_base_color.links and mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
                         object.material_slots[mat.name].material = mat_unique
                         break
             if mat not in mat_uniques:
-                if len(mat_base_color.links) > 0:
-                    mat_uniques.append(mat)
+                mat_uniques.append(mat)
             else:
                 bpy.data.materials.remove(mat)
 
@@ -194,7 +199,8 @@ def fix_alpha() -> None:
 def rename_materials(base_name: str) -> None:
     for object in bpy.data.objects:
         for material_slot in object.material_slots:
-            material_slot.material.name = 'M_' + base_name
+            if material_slot.material is not None:
+                material_slot.material.name = 'M_' + base_name
     return None
 
 
@@ -274,7 +280,7 @@ class RobotBuilder:
                 print('Object type', file_path[0], 'is not supported')
                 return None
             object = bpy.context.object
-            
+
             if material is None:
                 material = bpy.data.materials.get('Material')
                 if material is None:
