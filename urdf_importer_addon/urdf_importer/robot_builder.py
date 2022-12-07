@@ -334,7 +334,7 @@ class RobotBuilder:
 
     def set_link_origin(self, link: Link) -> None:
         if hasattr(link, 'origin') and link.origin is not None:
-            self.link_pose[link.name][0] += Vector(link.origin.xyz)
+            self.link_pose[link.name][0][:] = self.link_pose[link.name][0] + Vector(link.origin.xyz)
             self.link_pose[link.name][1].rotate(Euler(link.origin.rpy))
         return None
 
