@@ -173,11 +173,12 @@ def remove_identical_materials() -> None:
                     break
                 mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
                     'Base Color')
-                if is_mat_not_from_file:
+                is_mat_unique_not_from_file = not mat_unique_base_color.links
+                if is_mat_not_from_file and is_mat_unique_not_from_file:
                     if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value]:
                         object.material_slots[mat.name].material = mat_unique
                         break
-                else:
+                elif (not is_mat_not_from_file) and (not is_mat_unique_not_from_file):
                     if mat_unique_base_color.links and mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
                         object.material_slots[mat.name].material = mat_unique
                         break
@@ -205,7 +206,7 @@ def rename_materials(base_name: str) -> None:
 
 
 class RobotBuilder:
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, should_remove_identical_materials: bool, should_rename_materials: bool):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
@@ -214,10 +215,15 @@ class RobotBuilder:
         self.root_name = 'root'
         self.bone_tail = '.bone'
         self.parent_links = None
-        self.build_robot(file_path)
+        self.build_robot()
+        if should_remove_identical_materials:
+            remove_identical_materials()
+        if should_rename_materials:
+            robot_name = os.path.basename(os.path.splitext(file_path)[0])
+            rename_materials(robot_name)
         clean_up()
 
-    def build_robot(self, file_path) -> None:
+    def build_robot(self) -> None:
         clear_data(bpy.data)
         self.create_materials()
         self.konfigure_mesh_path()
@@ -225,9 +231,6 @@ class RobotBuilder:
         self.build_root()
         self.build_chain()
         fix_alpha()
-        remove_identical_materials()
-        robot_name = os.path.basename(os.path.splitext(file_path)[0])
-        rename_materials(robot_name)
         return None
 
     def create_materials(self) -> None:
@@ -334,7 +337,8 @@ class RobotBuilder:
 
     def set_link_origin(self, link: Link) -> None:
         if hasattr(link, 'origin') and link.origin is not None:
-            self.link_pose[link.name][0][:] = self.link_pose[link.name][0] + Vector(link.origin.xyz)
+            self.link_pose[link.name][0][:] = self.link_pose[link.name][0] + \
+                Vector(link.origin.xyz)
             self.link_pose[link.name][1].rotate(Euler(link.origin.rpy))
         return None
 
@@ -491,7 +495,7 @@ class RobotBuilder:
         return None
 
     def build_chain(self) -> None:
-        while(self.robot.child_map):
+        while (self.robot.child_map):
 
             # Make new parent links
             links = self.parent_links
