@@ -164,7 +164,7 @@ def remove_identical_materials() -> None:
             mat_base_color = mat.node_tree.nodes['Principled BSDF'].inputs.get(
                 'Base Color')
             is_mat_not_from_file = not mat_base_color.links
-            mat_unique: Material
+            is_mat_unique = True
             for mat_unique in mat_uniques:
                 try:
                     if not hasattr(mat_unique.node_tree, 'nodes'):
@@ -177,15 +177,17 @@ def remove_identical_materials() -> None:
                 if is_mat_not_from_file and is_mat_unique_not_from_file:
                     if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value]:
                         object.material_slots[mat.name].material = mat_unique
+                        bpy.data.materials.remove(mat)
+                        is_mat_unique = False
                         break
                 elif (not is_mat_not_from_file) and (not is_mat_unique_not_from_file):
-                    if mat_unique_base_color.links and mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
+                    if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
                         object.material_slots[mat.name].material = mat_unique
+                        bpy.data.materials.remove(mat)
+                        is_mat_unique = False
                         break
-            if mat not in mat_uniques:
+            if is_mat_unique:
                 mat_uniques.append(mat)
-            else:
-                bpy.data.materials.remove(mat)
 
         object.select_set(False)
     return None
