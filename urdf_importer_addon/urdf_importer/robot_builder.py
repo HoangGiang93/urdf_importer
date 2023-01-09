@@ -304,6 +304,8 @@ class RobotBuilder:
             if file_ext == '.dae':
                 (file_path, _) = fix_up_axis_and_get_materials(file_path)
                 bpy.ops.wm.collada_import(filepath=file_path)
+            elif file_ext =='.obj':
+                bpy.ops.import_scene.obj(filepath=file_path, axis_forward='Y', axis_up='Z')
             elif file_ext == '.stl':
                 bpy.ops.import_mesh.stl(filepath=file_path)
             else:
@@ -316,6 +318,7 @@ class RobotBuilder:
             light: Light
             for light in bpy.data.lights:
                 bpy.data.lights.remove(light)
+            bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
             bpy.ops.object.join()
             if not bpy.context.object.data.uv_layers:
                 bpy.ops.mesh.uv_texture_add()
