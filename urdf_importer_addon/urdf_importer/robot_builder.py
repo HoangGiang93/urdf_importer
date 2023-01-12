@@ -95,7 +95,8 @@ def fix_up_axis_and_get_materials(file_path: str):
                         if 'init_from' in ele3.tag:
                             tmp_file_path = TMP_FILE_PATH
                             file_name, file_ext = os.path.splitext(ele3.text)
-                            file_hash = str(abs(hash(os.path.dirname(file_path))) % (10 ** 3))
+                            file_hash = str(
+                                abs(hash(os.path.dirname(file_path))) % (10 ** 3))
                             file = 'T_' + file_name + '_' + file_hash + file_ext
                             copy(dir_path + '/' + ele3.text,
                                  TMP_TEXTURE_PATH + file)
@@ -168,7 +169,7 @@ def remove_identical_materials() -> None:
             for mat_unique in mat_uniques:
                 mat_name_split = mat.name_full.split('.')
                 mat_unique_name_split = mat_unique.name_full.split('.')
-                if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1:
+                if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
                     mat_name_split.pop()
                     mat_unique_name_split.pop()
                 for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
@@ -312,8 +313,9 @@ class RobotBuilder:
             if file_ext == '.dae':
                 (file_path, _) = fix_up_axis_and_get_materials(file_path)
                 bpy.ops.wm.collada_import(filepath=file_path)
-            elif file_ext =='.obj':
-                bpy.ops.import_scene.obj(filepath=file_path, axis_forward='Y', axis_up='Z')
+            elif file_ext == '.obj':
+                bpy.ops.import_scene.obj(
+                    filepath=file_path, axis_forward='Y', axis_up='Z')
             elif file_ext == '.stl':
                 bpy.ops.import_mesh.stl(filepath=file_path)
             else:
