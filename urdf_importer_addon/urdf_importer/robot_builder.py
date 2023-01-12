@@ -166,6 +166,21 @@ def remove_identical_materials() -> None:
             is_mat_not_from_file = not mat_base_color.links
             is_mat_unique = True
             for mat_unique in mat_uniques:
+                mat_name_split = mat.name_full.split('.')
+                mat_unique_name_split = mat_unique.name_full.split('.')
+                if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1:
+                    mat_name_split.pop()
+                    mat_unique_name_split.pop()
+                for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
+                    if mat_name == mat_unique_name:
+                        is_mat_unique = False
+                    else:
+                        is_mat_unique = True
+                        break
+                if not is_mat_unique:
+                    object.material_slots[mat.name].material = mat_unique
+                    bpy.data.materials.remove(mat)
+                    break
                 try:
                     if not hasattr(mat_unique.node_tree, 'nodes'):
                         break
@@ -175,13 +190,6 @@ def remove_identical_materials() -> None:
                     'Base Color')
                 is_mat_unique_not_from_file = not mat_unique_base_color.links
                 if is_mat_not_from_file and is_mat_unique_not_from_file:
-                    mat_name_split = mat.name_full.split('.')
-                    mat_unique_name_split = mat_unique.name_full.split('.')
-                    for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
-                        if mat_name == mat_unique_name:
-                            is_mat_unique = False
-                        else:
-                            break
                     if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value] and (not is_mat_unique):
                         object.material_slots[mat.name].material = mat_unique
                         bpy.data.materials.remove(mat)
