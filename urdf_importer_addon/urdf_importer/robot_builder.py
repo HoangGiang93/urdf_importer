@@ -31,7 +31,7 @@ def urdf_cleanup(file_path: str) -> str:
     return ElementTree.tostring(newroot)
 
 
-def fix_up_axis_and_get_materials(file_path: str):
+def fix_up_axis_and_get_materials(file_path: str, unique_path: bool):
     tree = ElementTree.parse(file_path)
     root = tree.getroot()
 
@@ -95,9 +95,12 @@ def fix_up_axis_and_get_materials(file_path: str):
                         if 'init_from' in ele3.tag:
                             tmp_file_path = TMP_FILE_PATH
                             file_name, file_ext = os.path.splitext(ele3.text)
-                            file_hash = str(
-                                abs(hash(os.path.dirname(file_path))) % (10 ** 3))
-                            file = 'T_' + file_name + '_' + file_hash + file_ext
+                            if unique_path:
+                                file_hash = str(
+                                    abs(hash(os.path.dirname(file_path))) % (10 ** 3))
+                                file = 'T_' + file_name + '_' + file_hash + file_ext
+                            else:
+                                file = 'T_' + file_name + file_ext
                             copy(dir_path + '/' + ele3.text,
                                  TMP_TEXTURE_PATH + file)
                             ele3.text = TMP_TEXTURE_PATH + file
@@ -150,61 +153,37 @@ def clear_data(data: BlendData) -> None:
     return None
 
 
-def merge_materials(should_merge_same_name_materials: bool, should_merge_duplicate_materials: bool) -> None:
+def merge_materials() -> None:
     mat_uniques: List[Material] = []
     object: Object
     for object in bpy.data.objects:
 
         for material_slot in object.material_slots:
             mat = material_slot.material
-            try:
-                if not hasattr(mat.node_tree, 'nodes'):
-                    continue
-            except (ReferenceError, AttributeError):
+            if mat is None or not mat.use_nodes:
                 continue
             mat_base_color = mat.node_tree.nodes['Principled BSDF'].inputs.get(
                 'Base Color')
-            is_mat_not_from_file = not mat_base_color.links
             is_mat_unique = True
             for mat_unique in mat_uniques:
-                if should_merge_same_name_materials:
-                    mat_name_split = mat.name_full.split('.')
-                    mat_unique_name_split = mat_unique.name_full.split('.')
-                    if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
-                        mat_name_split.pop()
-                        mat_unique_name_split.pop()
-                    for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
-                        if mat_name == mat_unique_name:
-                            is_mat_unique = False
-                        else:
-                            is_mat_unique = True
-                            break
-                if not is_mat_unique:
-                    object.material_slots[mat.name].material = mat_unique
-                    bpy.data.materials.remove(mat)
-                    break
-                if should_merge_duplicate_materials:
-                    try:
-                        if not hasattr(mat_unique.node_tree, 'nodes'):
-                            break
-                    except ReferenceError:
+                if mat == mat_unique:
+                    continue
+                # Merge duplicate materials based on their Base Color
+                mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
+                    'Base Color')
+                if (not mat_base_color.is_linked) and (not mat_unique_base_color.is_linked):
+                    if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value]:
+                        object.material_slots[mat.name].material = mat_unique
+                        bpy.data.materials.remove(mat)
+                        is_mat_unique = False
                         break
-                    mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
-                        'Base Color')
-                    is_mat_unique_not_from_file = not mat_unique_base_color.links
-                    if is_mat_not_from_file and is_mat_unique_not_from_file:
-                        if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value] and (not is_mat_unique):
-                            object.material_slots[mat.name].material = mat_unique
-                            bpy.data.materials.remove(mat)
-                            is_mat_unique = False
-                            break
-                    elif (not is_mat_not_from_file) and (not is_mat_unique_not_from_file):
-                        if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
-                            object.material_slots[mat.name].material = mat_unique
-                            bpy.data.materials.remove(mat)
-                            is_mat_unique = False
-                            break
-            if is_mat_unique:
+                elif mat_base_color.is_linked and mat_unique_base_color.is_linked:
+                    if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
+                        object.material_slots[mat.name].material = mat_unique
+                        bpy.data.materials.remove(mat)
+                        is_mat_unique = False
+                        break
+            if is_mat_unique and mat is not None:
                 mat_uniques.append(mat)
 
         object.select_set(False)
@@ -226,7 +205,7 @@ def rename_materials(base_name: str) -> None:
 
 
 class RobotBuilder:
-    def __init__(self, file_path: str, should_merge_same_name_materials: bool, should_merge_duplicate_materials: bool, should_rename_materials: bool, should_apply_weld: bool):
+    def __init__(self, file_path: str, should_merge_duplicate_materials: bool, should_rename_materials: bool, should_apply_weld: bool, unique_path: bool):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
@@ -236,9 +215,10 @@ class RobotBuilder:
         self.bone_tail = '.bone'
         self.parent_links = None
         self.apply_weld = should_apply_weld
+        self.unique_path = unique_path
         self.build_robot()
-        if should_merge_same_name_materials or should_merge_duplicate_materials:
-            merge_materials(should_merge_same_name_materials, should_merge_duplicate_materials)
+        if should_merge_duplicate_materials:
+            merge_materials()
         if should_rename_materials:
             robot_name = os.path.basename(os.path.splitext(file_path)[0])
             rename_materials(robot_name)
@@ -289,7 +269,7 @@ class RobotBuilder:
         bpy.context.scene.collection.objects.link(self.root)
         return None
 
-    def add_mesh(self, mesh_name: str, material: Material = None, file_path: Union[str, List[str]] = '', location=Vector(), rotation=Euler(), scale=Vector((1, 1, 1)), link_pos=Vector(), link_rot=Euler()) -> None:
+    def add_mesh(self, mesh_name: str, material: Material = None, file_path: Union[str, List[str]] = '', location=Vector(), rotation=Euler(), scale=Vector((1, 1, 1)), link_pos=Vector(), link_rot=Euler()) -> Object:
         if isinstance(file_path, list):
             if file_path[0] == 'cylinder':
                 bpy.ops.mesh.primitive_cylinder_add(
@@ -314,7 +294,7 @@ class RobotBuilder:
         elif file_path:
             file_ext = os.path.splitext(file_path)[1].lower()
             if file_ext == '.dae':
-                (file_path, _) = fix_up_axis_and_get_materials(file_path)
+                (file_path, _) = fix_up_axis_and_get_materials(file_path, self.unique_path)
                 bpy.ops.wm.collada_import(filepath=file_path)
             elif file_ext == '.obj':
                 bpy.ops.import_scene.obj(
@@ -332,7 +312,8 @@ class RobotBuilder:
             for light in bpy.data.lights:
                 bpy.data.lights.remove(light)
             bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
-            bpy.ops.object.join()
+            if len(bpy.context.selected_objects) > 1:
+                bpy.ops.object.join()
             if not bpy.context.object.data.uv_layers:
                 bpy.ops.mesh.uv_texture_add()
             object = bpy.context.object
@@ -367,7 +348,7 @@ class RobotBuilder:
         bpy.ops.object.transform_apply(location = False, rotation = False, scale = True)
         object.scale /= 100
         
-        return None
+        return object
 
     def set_link_origin(self, link: Link) -> None:
         if hasattr(link, 'origin') and link.origin is not None:
@@ -438,6 +419,10 @@ class RobotBuilder:
             material = bpy.data.materials.get(visual.material.name)
             if material is None:
                 material = bpy.data.materials.new(visual.material.name)
+                if hasattr(visual.material, 'color') and visual.material.color and visual.material.color.rgba:
+                    material.use_nodes = True
+                    principled_node = material.node_tree.nodes.get('Principled BSDF')
+                    principled_node.inputs[0].default_value = visual.material.color.rgba
         else:
             material = None
 
@@ -505,6 +490,7 @@ class RobotBuilder:
         self.set_link_origin(root_link)
 
         if root_link.visuals:
+            objects = []
             visual: Visual
             for visual in root_link.visuals:
                 mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
@@ -518,12 +504,26 @@ class RobotBuilder:
                 rot_tmp.rotate(visual_rot)
                 visual_rot = rot_tmp
 
-                self.add_root_mesh_and_bone(
-                    mesh_name, material, file_path, root_link, visual_pos, visual_rot, scale)
+                object = self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot,
+                                       scale, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
+                objects.append(object)
+
+            for object in objects:
+                object.select_set(True)
+
+            if len(bpy.context.selected_objects) > 1:
+                bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
+                bpy.ops.object.join()
+
+            bone_name = self.root_name + self.bone_tail
+            self.add_root_bone(root_link.name, bone_name)
+
+            objects[0].name = root_link.name
+            self.bind_mesh_to_bone(root_link.name, bone_name)
 
         else:
             self.add_root_mesh_and_bone(
-                root_link.name + '.empty', None, None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
+                root_link.name, None, None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
 
         self.parent_links = [root_link]
         return None
@@ -559,16 +559,28 @@ class RobotBuilder:
 
                         if child_link.visuals:
                             visual: Visual
+                            objects = []
                             for visual in child_link.visuals:
                                 mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                                     child_pos, child_rot, child_link, visual)
+                                object = self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot, scale, self.link_pose[link.name][0], self.link_pose[link.name][1])
+                                objects.append(object)
 
-                                self.add_mesh_and_bone(
-                                    mesh_name, material, file_path, child_link, child_joint, visual_pos, visual_rot, joint_pos, joint_rot, scale)
+                            for object in objects:
+                                object.select_set(True)
+                            
+                            if len(bpy.context.selected_objects) > 1:
+                                bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
+                                bpy.ops.object.join()
 
+                            bone_name = child_joint.name + '.' + str(child_joint.type) + self.bone_tail
+                            self.add_bone(child_link, child_joint, joint_pos, joint_rot, bone_name)
+                            
+                            objects[0].name = child_link.name
+                            self.bind_mesh_to_bone(child_link.name, bone_name)
                         else:
                             self.add_mesh_and_bone(
-                                child_link.name + '.empty', None, None, child_link, child_joint, child_pos, child_rot, joint_pos, joint_rot)
+                                child_link.name, None, None, child_link, child_joint, child_pos, child_rot, joint_pos, joint_rot)
 
                         self.parent_links.append(child_link)
 
