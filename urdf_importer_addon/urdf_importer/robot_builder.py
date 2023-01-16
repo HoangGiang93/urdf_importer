@@ -224,7 +224,7 @@ def rename_materials(base_name: str) -> None:
 
 
 class RobotBuilder:
-    def __init__(self, file_path: str, should_remove_identical_materials: bool, should_rename_materials: bool):
+    def __init__(self, file_path: str, should_remove_identical_materials: bool, should_rename_materials: bool, should_apply_weld: bool):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
@@ -233,6 +233,7 @@ class RobotBuilder:
         self.root_name = 'root'
         self.bone_tail = '.bone'
         self.parent_links = None
+        self.apply_weld = should_apply_weld
         self.build_robot()
         if should_remove_identical_materials:
             remove_identical_materials()
@@ -333,8 +334,9 @@ class RobotBuilder:
             if not bpy.context.object.data.uv_layers:
                 bpy.ops.mesh.uv_texture_add()
             object = bpy.context.object
-            object.modifiers.new('Weld', 'WELD')
-            bpy.ops.object.modifier_apply(modifier='Weld')
+            if self.apply_weld:
+                object.modifiers.new('Weld', 'WELD')
+                bpy.ops.object.modifier_apply(modifier='Weld')
             if material is not None:
                 object.data.materials.append(material)
 
