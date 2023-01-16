@@ -333,6 +333,8 @@ class RobotBuilder:
             if not bpy.context.object.data.uv_layers:
                 bpy.ops.mesh.uv_texture_add()
             object = bpy.context.object
+            object.modifiers.new('Weld', 'WELD')
+            bpy.ops.object.modifier_apply(modifier='Weld')
             if material is not None:
                 object.data.materials.append(material)
 
@@ -355,6 +357,12 @@ class RobotBuilder:
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         bpy.context.scene.cursor.location = Vector()
         bpy.context.scene.cursor.rotation_euler = Euler()
+
+        # Apply 0.01 scale
+        object.scale *= 100
+        bpy.ops.object.transform_apply(location = False, rotation = False, scale = True)
+        object.scale /= 100
+        
         return None
 
     def set_link_origin(self, link: Link) -> None:
