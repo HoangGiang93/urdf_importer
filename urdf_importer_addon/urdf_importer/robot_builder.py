@@ -150,7 +150,7 @@ def clear_data(data: BlendData) -> None:
     return None
 
 
-def remove_identical_materials() -> None:
+def merge_materials(should_merge_same_name_materials: bool, should_merge_duplicate_materials: bool) -> None:
     mat_uniques: List[Material] = []
     object: Object
     for object in bpy.data.objects:
@@ -167,41 +167,43 @@ def remove_identical_materials() -> None:
             is_mat_not_from_file = not mat_base_color.links
             is_mat_unique = True
             for mat_unique in mat_uniques:
-                mat_name_split = mat.name_full.split('.')
-                mat_unique_name_split = mat_unique.name_full.split('.')
-                if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
-                    mat_name_split.pop()
-                    mat_unique_name_split.pop()
-                for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
-                    if mat_name == mat_unique_name:
-                        is_mat_unique = False
-                    else:
-                        is_mat_unique = True
-                        break
+                if should_merge_same_name_materials:
+                    mat_name_split = mat.name_full.split('.')
+                    mat_unique_name_split = mat_unique.name_full.split('.')
+                    if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
+                        mat_name_split.pop()
+                        mat_unique_name_split.pop()
+                    for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
+                        if mat_name == mat_unique_name:
+                            is_mat_unique = False
+                        else:
+                            is_mat_unique = True
+                            break
                 if not is_mat_unique:
                     object.material_slots[mat.name].material = mat_unique
                     bpy.data.materials.remove(mat)
                     break
-                try:
-                    if not hasattr(mat_unique.node_tree, 'nodes'):
+                if should_merge_duplicate_materials:
+                    try:
+                        if not hasattr(mat_unique.node_tree, 'nodes'):
+                            break
+                    except ReferenceError:
                         break
-                except ReferenceError:
-                    break
-                mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
-                    'Base Color')
-                is_mat_unique_not_from_file = not mat_unique_base_color.links
-                if is_mat_not_from_file and is_mat_unique_not_from_file:
-                    if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value] and (not is_mat_unique):
-                        object.material_slots[mat.name].material = mat_unique
-                        bpy.data.materials.remove(mat)
-                        is_mat_unique = False
-                        break
-                elif (not is_mat_not_from_file) and (not is_mat_unique_not_from_file):
-                    if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
-                        object.material_slots[mat.name].material = mat_unique
-                        bpy.data.materials.remove(mat)
-                        is_mat_unique = False
-                        break
+                    mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
+                        'Base Color')
+                    is_mat_unique_not_from_file = not mat_unique_base_color.links
+                    if is_mat_not_from_file and is_mat_unique_not_from_file:
+                        if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value] and (not is_mat_unique):
+                            object.material_slots[mat.name].material = mat_unique
+                            bpy.data.materials.remove(mat)
+                            is_mat_unique = False
+                            break
+                    elif (not is_mat_not_from_file) and (not is_mat_unique_not_from_file):
+                        if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
+                            object.material_slots[mat.name].material = mat_unique
+                            bpy.data.materials.remove(mat)
+                            is_mat_unique = False
+                            break
             if is_mat_unique:
                 mat_uniques.append(mat)
 
@@ -224,7 +226,7 @@ def rename_materials(base_name: str) -> None:
 
 
 class RobotBuilder:
-    def __init__(self, file_path: str, should_remove_identical_materials: bool, should_rename_materials: bool, should_apply_weld: bool):
+    def __init__(self, file_path: str, should_merge_same_name_materials: bool, should_merge_duplicate_materials: bool, should_rename_materials: bool, should_apply_weld: bool):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
@@ -235,8 +237,8 @@ class RobotBuilder:
         self.parent_links = None
         self.apply_weld = should_apply_weld
         self.build_robot()
-        if should_remove_identical_materials:
-            remove_identical_materials()
+        if should_merge_same_name_materials or should_merge_duplicate_materials:
+            merge_materials(should_merge_same_name_materials, should_merge_duplicate_materials)
         if should_rename_materials:
             robot_name = os.path.basename(os.path.splitext(file_path)[0])
             rename_materials(robot_name)
