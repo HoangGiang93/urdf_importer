@@ -563,7 +563,7 @@ class RobotBuilder:
                             for visual in child_link.visuals:
                                 mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                                     child_pos, child_rot, child_link, visual)
-                                object = self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot, scale, self.link_pose[link.name][0], self.link_pose[link.name][1])
+                                object = self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot, scale, self.link_pose[child_link.name][0], self.link_pose[child_link.name][1])
                                 objects.append(object)
 
                             for object in objects:
