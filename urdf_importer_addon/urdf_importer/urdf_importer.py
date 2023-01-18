@@ -20,7 +20,7 @@ class URDFImporter(bpy.types.Operator, ImportHelper):
     merge_duplicate_materials: bpy.props.BoolProperty(name="Merge duplicate materials", default=True)
     rename_materials: bpy.props.BoolProperty(name="Rename materials", default=True)
     apply_weld: bpy.props.BoolProperty(name="Apply weld modifier", default=True)
-    unique_path: bpy.props.BoolProperty(name="Each texture has unique path", default=True)
+    unique_path: bpy.props.BoolProperty(name="Each texture has an unique path", default=True)
 
     # ImportHelper mixin class uses this
     filename_ext = ".urdf"

@@ -166,26 +166,75 @@ def merge_materials() -> None:
                 'Base Color')
             is_mat_unique = True
             for mat_unique in mat_uniques:
+                
+                # Level 1: Check for equalness
                 if mat == mat_unique:
                     continue
-                # Merge duplicate materials based on their Base Color
+                    
+                # Level 2: Check for name equalness
+                mat_name_split = mat.name_full.split('.')
+                mat_unique_name_split = mat_unique.name_full.split('.')
+                if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
+                    mat_name_split.pop()
+                    mat_unique_name_split.pop()
+                for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
+                    if mat_name[:59] == mat_unique_name[:59]:
+                        is_mat_unique = False
+                    else:
+                        is_mat_unique = True
+                        break
+                if is_mat_unique:
+                    continue
+                
+                # Level 3: Check for content equalness
                 mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
                     'Base Color')
                 if (not mat_base_color.is_linked) and (not mat_unique_base_color.is_linked):
+                    # Merge duplicate materials based on their Base Color
                     if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value]:
                         object.material_slots[mat.name].material = mat_unique
                         bpy.data.materials.remove(mat)
                         is_mat_unique = False
                         break
                 elif mat_base_color.is_linked and mat_unique_base_color.is_linked:
+                    # Merge duplicate materials based on their image name
                     if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
                         object.material_slots[mat.name].material = mat_unique
                         bpy.data.materials.remove(mat)
                         is_mat_unique = False
                         break
+            
             if is_mat_unique and mat is not None:
-                mat_uniques.append(mat)
-
+                mat_name_split = mat.name_full.split('.')
+                mat_unique = None
+                while len(mat_name_split) > 1 and mat_name_split[-1].isnumeric():
+                    mat_name = ''.join(mat_name_split[:-1])
+                    if bpy.data.materials.get(mat_name) is not None:
+                        mat_unique = bpy.data.materials[mat_name]
+                    mat_name_split.pop()
+                
+                if mat_unique is None:
+                    mat_uniques.append(mat)
+                else:
+                    # Level 3: Check for content equalness
+                    mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
+                        'Base Color')
+                    is_mat_unique_equal_mat = False
+                    if (not mat_base_color.is_linked) and (not mat_unique_base_color.is_linked):
+                        # Merge duplicate materials based on their Base Color
+                        if [i for i in mat_base_color.default_value] == [i for i in mat_unique_base_color.default_value]:
+                            is_mat_unique_equal_mat = True
+                    elif mat_base_color.is_linked and mat_unique_base_color.is_linked:
+                        # Merge duplicate materials based on their image name
+                        if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
+                            is_mat_unique_equal_mat = True
+                            
+                    if is_mat_unique_equal_mat:
+                        object.material_slots[mat.name].material = mat_unique
+                        bpy.data.materials.remove(mat)
+                        mat_uniques.append(mat_unique)
+                    else:
+                        mat_uniques.append(mat)
         object.select_set(False)
     return None
 
