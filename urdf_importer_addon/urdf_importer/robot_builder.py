@@ -270,8 +270,7 @@ class RobotBuilder:
         if should_merge_duplicate_materials:
             merge_materials(should_check_material_name)
         if should_rename_materials:
-            robot_name = os.path.basename(os.path.splitext(file_path)[0])
-            rename_materials(robot_name)
+            rename_materials(self.robot.name)
         clean_up()
 
     def build_robot(self) -> None:
