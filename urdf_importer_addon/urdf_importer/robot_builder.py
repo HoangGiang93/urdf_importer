@@ -31,7 +31,7 @@ def urdf_cleanup(file_path: str) -> str:
     return ElementTree.tostring(newroot)
 
 
-def fix_up_axis_and_get_materials(file_path: str, unique_path: bool):
+def fix_up_axis_and_get_materials(file_path: str, unique_name: bool):
     tree = ElementTree.parse(file_path)
     root = tree.getroot()
 
@@ -95,7 +95,7 @@ def fix_up_axis_and_get_materials(file_path: str, unique_path: bool):
                         if 'init_from' in ele3.tag:
                             tmp_file_path = TMP_FILE_PATH
                             file_name, file_ext = os.path.splitext(ele3.text)
-                            if unique_path:
+                            if not unique_name:
                                 file_hash = str(
                                     abs(hash(os.path.dirname(file_path))) % (10 ** 3))
                                 file = 'T_' + file_name + '_' + file_hash + file_ext
@@ -153,7 +153,7 @@ def clear_data(data: BlendData) -> None:
     return None
 
 
-def merge_materials() -> None:
+def merge_materials(should_check_material_name: bool) -> None:
     mat_uniques: List[Material] = []
     object: Object
     for object in bpy.data.objects:
@@ -170,21 +170,22 @@ def merge_materials() -> None:
                 # Level 1: Check for equalness
                 if mat == mat_unique:
                     continue
-                    
-                # Level 2: Check for name equalness
-                mat_name_split = mat.name_full.split('.')
-                mat_unique_name_split = mat_unique.name_full.split('.')
-                if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
-                    mat_name_split.pop()
-                    mat_unique_name_split.pop()
-                for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
-                    if mat_name[:59] == mat_unique_name[:59]:
-                        is_mat_unique = False
-                    else:
-                        is_mat_unique = True
-                        break
-                if is_mat_unique:
-                    continue
+                
+                if should_check_material_name:
+                    # Level 2: Check for name equalness
+                    mat_name_split = mat.name_full.split('.')
+                    mat_unique_name_split = mat_unique.name_full.split('.')
+                    if len(mat_name_split) == len(mat_unique_name_split) and len(mat_name_split) > 1 and mat_name_split[-1].isnumeric() and mat_unique_name_split[-1].isnumeric():
+                        mat_name_split.pop()
+                        mat_unique_name_split.pop()
+                    for mat_name, mat_unique_name in zip(mat_name_split, mat_unique_name_split):
+                        if mat_name[:59] == mat_unique_name[:59]:
+                            is_mat_unique = False
+                        else:
+                            is_mat_unique = True
+                            break
+                    if is_mat_unique:
+                        continue
                 
                 # Level 3: Check for content equalness
                 mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
@@ -254,7 +255,7 @@ def rename_materials(base_name: str) -> None:
 
 
 class RobotBuilder:
-    def __init__(self, file_path: str, should_merge_duplicate_materials: bool, should_rename_materials: bool, should_apply_weld: bool, unique_path: bool):
+    def __init__(self, file_path: str, should_merge_duplicate_materials: bool, should_check_material_name: bool, should_rename_materials: bool, should_apply_weld: bool, unique_name: bool):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
@@ -264,10 +265,10 @@ class RobotBuilder:
         self.bone_tail = '.bone'
         self.parent_links = None
         self.apply_weld = should_apply_weld
-        self.unique_path = unique_path
+        self.unique_name = unique_name
         self.build_robot()
         if should_merge_duplicate_materials:
-            merge_materials()
+            merge_materials(should_check_material_name)
         if should_rename_materials:
             robot_name = os.path.basename(os.path.splitext(file_path)[0])
             rename_materials(robot_name)
@@ -343,7 +344,7 @@ class RobotBuilder:
         elif file_path:
             file_ext = os.path.splitext(file_path)[1].lower()
             if file_ext == '.dae':
-                (file_path, _) = fix_up_axis_and_get_materials(file_path, self.unique_path)
+                (file_path, _) = fix_up_axis_and_get_materials(file_path, self.unique_name)
                 bpy.ops.wm.collada_import(filepath=file_path)
             elif file_ext == '.obj':
                 bpy.ops.import_scene.obj(
