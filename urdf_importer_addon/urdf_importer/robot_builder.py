@@ -516,23 +516,6 @@ class RobotBuilder:
         bpy.ops.object.mode_set(mode='OBJECT')
         return None
 
-    def add_root_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, pos: Vector, rot: Euler, scale: Vector = Vector((1, 1, 1))) -> None:
-        self.add_mesh(mesh_name, material, file_path, pos, rot, scale,
-                      self.link_pose[link.name][0], self.link_pose[link.name][1])
-        bone_name = self.root_name + self.bone_tail
-        self.add_root_bone(link.name, bone_name)
-        self.bind_mesh_to_bone(
-            mesh_name, bone_name)
-        return None
-
-    def add_mesh_and_bone(self, mesh_name: str, material: Material, file_path: Union[str, List[str]], link: Link, joint: Joint, visual_pos: Vector, visual_rot: Euler, joint_pos: Vector, joint_rot: Euler, scale=Vector((1, 1, 1))) -> None:
-        self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot, scale,
-                      self.link_pose[link.name][0], self.link_pose[link.name][1])
-        bone_name = joint.name + '.' + str(joint.type) + self.bone_tail
-        self.add_bone(link, joint, joint_pos, joint_rot, bone_name)
-        self.bind_mesh_to_bone(mesh_name, bone_name)
-        return None
-
     def build_root(self) -> None:
         root_link: Link = self.robot.link_map[self.robot.get_root()]
         self.link_pose[root_link.name] = (Vector(), Euler())
@@ -571,8 +554,8 @@ class RobotBuilder:
             self.bind_mesh_to_bone(root_link.name, bone_name)
 
         else:
-            self.add_root_mesh_and_bone(
-                root_link.name, None, None, root_link, self.link_pose[root_link.name][0], self.link_pose[root_link.name][1])
+            bone_name = self.root_name + self.bone_tail
+            self.add_root_bone(root_link.name, bone_name)
 
         self.parent_links = [root_link]
         return None
@@ -628,8 +611,8 @@ class RobotBuilder:
                             objects[0].name = child_link.name
                             self.bind_mesh_to_bone(child_link.name, bone_name)
                         else:
-                            self.add_mesh_and_bone(
-                                child_link.name, None, None, child_link, child_joint, child_pos, child_rot, joint_pos, joint_rot)
+                            bone_name = child_joint.name + '.' + str(child_joint.type) + self.bone_tail
+                            self.add_bone(child_link, child_joint, child_pos, child_rot, bone_name)
 
                         self.parent_links.append(child_link)
 
