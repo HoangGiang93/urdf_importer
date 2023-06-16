@@ -127,7 +127,7 @@ def clean_up() -> None:
     return None
 
 
-def clear_data(data: BlendData) -> None:
+def clear_data(data: BlendData, scale_unit: float) -> None:
     armature: Armature
     for armature in data.armatures:
         data.armatures.remove(armature)
@@ -150,6 +150,10 @@ def clear_data(data: BlendData) -> None:
     for image in data.images:
         data.images.remove(image)
 
+    unit_settings = bpy.context.scene.unit_settings
+    unit_settings.scale_length = scale_unit
+    bpy.context.view_layer.update()
+
     return None
 
 
@@ -166,11 +170,11 @@ def merge_materials(should_check_material_name: bool) -> None:
                 'Base Color')
             is_mat_unique = True
             for mat_unique in mat_uniques:
-                
+
                 # Level 1: Check for equalness
                 if mat == mat_unique:
                     continue
-                
+
                 if should_check_material_name:
                     # Level 2: Check for name equalness
                     mat_name_split = mat.name_full.split('.')
@@ -186,7 +190,7 @@ def merge_materials(should_check_material_name: bool) -> None:
                             break
                     if is_mat_unique:
                         continue
-                
+
                 # Level 3: Check for content equalness
                 mat_unique_base_color = mat_unique.node_tree.nodes['Principled BSDF'].inputs.get(
                     'Base Color')
@@ -204,7 +208,7 @@ def merge_materials(should_check_material_name: bool) -> None:
                         bpy.data.materials.remove(mat)
                         is_mat_unique = False
                         break
-            
+
             if is_mat_unique and mat is not None:
                 mat_name_split = mat.name_full.split('.')
                 mat_unique = None
@@ -213,7 +217,7 @@ def merge_materials(should_check_material_name: bool) -> None:
                     if bpy.data.materials.get(mat_name) is not None:
                         mat_unique = bpy.data.materials[mat_name]
                     mat_name_split.pop()
-                
+
                 if mat_unique is None:
                     mat_uniques.append(mat)
                 else:
@@ -229,7 +233,7 @@ def merge_materials(should_check_material_name: bool) -> None:
                         # Merge duplicate materials based on their image name
                         if mat_base_color.links[0].from_node.image.name == mat_unique_base_color.links[0].from_node.image.name:
                             is_mat_unique_equal_mat = True
-                            
+
                     if is_mat_unique_equal_mat:
                         object.material_slots[mat.name].material = mat_unique
                         bpy.data.materials.remove(mat)
@@ -255,7 +259,7 @@ def rename_materials(base_name: str) -> None:
 
 
 class RobotBuilder:
-    def __init__(self, file_path: str, should_merge_duplicate_materials: bool, should_check_material_name: bool, should_rename_materials: bool, should_apply_weld: bool, unique_name: bool):
+    def __init__(self, file_path: str, should_merge_duplicate_materials: bool, should_check_material_name: bool, should_rename_materials: bool, should_apply_weld: bool, unique_name: bool, scale_unit: float):
         xml_string = urdf_cleanup(file_path)
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
@@ -266,6 +270,7 @@ class RobotBuilder:
         self.parent_links = None
         self.apply_weld = should_apply_weld
         self.unique_name = unique_name
+        self.scale_unit = scale_unit
         self.build_robot()
         if should_merge_duplicate_materials:
             merge_materials(should_check_material_name)
@@ -274,7 +279,7 @@ class RobotBuilder:
         clean_up()
 
     def build_robot(self) -> None:
-        clear_data(bpy.data)
+        clear_data(bpy.data, self.scale_unit)
         self.create_materials()
         self.konfigure_mesh_path()
         self.add_root_armature()
@@ -343,7 +348,8 @@ class RobotBuilder:
         elif file_path:
             file_ext = os.path.splitext(file_path)[1].lower()
             if file_ext == '.dae':
-                (file_path, _) = fix_up_axis_and_get_materials(file_path, self.unique_name)
+                (file_path, _) = fix_up_axis_and_get_materials(
+                    file_path, self.unique_name)
                 bpy.ops.wm.collada_import(filepath=file_path)
             elif file_ext == '.obj':
                 bpy.ops.import_scene.obj(
@@ -393,16 +399,17 @@ class RobotBuilder:
         bpy.context.scene.cursor.rotation_euler = Euler()
 
         # Apply 0.01 scale
-        object.scale *= 100
-        bpy.ops.object.transform_apply(location = False, rotation = False, scale = True)
-        object.scale /= 100
-        
+        # object.scale *= 100
+        bpy.ops.object.transform_apply(
+            location=False, rotation=False, scale=True)
+        # object.scale /= 100
+
         return object
 
     def set_link_origin(self, link: Link) -> None:
         if hasattr(link, 'origin') and link.origin is not None:
             self.link_pose[link.name][0][:] = self.link_pose[link.name][0] + \
-                Vector(link.origin.xyz)
+                Vector(link.origin.xyz) / self.scale_unit
             self.link_pose[link.name][1].rotate(Euler(link.origin.rpy))
         return None
 
@@ -411,7 +418,7 @@ class RobotBuilder:
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
         head = self.link_pose[link_name][0]
-        tail = Vector((0.0, 0.1, 0.0))
+        tail = Vector((0.0, 0.1 / self.scale_unit, 0.0))
         tail.rotate(self.link_pose[link_name][1])
         tail += head
         bone: Bone = self.root.data.edit_bones.new(bone_name)
@@ -422,7 +429,7 @@ class RobotBuilder:
 
     def add_link_origin(self, pos: Vector, rot: Euler, tag: Union[Link, Joint, Visual]) -> Tuple[Vector, Euler]:
         if hasattr(tag, 'origin') and tag.origin is not None:
-            pos_out = Vector(tag.origin.xyz)
+            pos_out = Vector(tag.origin.xyz) / self.scale_unit
             pos_out.rotate(rot)
             pos_out += pos
             rot_out = Euler(tag.origin.rpy)
@@ -470,7 +477,8 @@ class RobotBuilder:
                 material = bpy.data.materials.new(visual.material.name)
                 if hasattr(visual.material, 'color') and visual.material.color and visual.material.color.rgba:
                     material.use_nodes = True
-                    principled_node = material.node_tree.nodes.get('Principled BSDF')
+                    principled_node = material.node_tree.nodes.get(
+                        'Principled BSDF')
                     principled_node.inputs[0].default_value = visual.material.color.rgba
         else:
             material = None
@@ -496,9 +504,9 @@ class RobotBuilder:
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
         head = joint_pos
-        tail = Vector((0.0, 0.0, 0.1))
+        tail = Vector((0.0, 0.0, 0.1 / self.scale_unit))
         if hasattr(joint, 'axis') and joint.axis is not None and Vector(joint.axis).magnitude != 0:
-            tail = Vector(joint.axis).normalized() * 0.1
+            tail = Vector(joint.axis).normalized() * 0.1 / self.scale_unit
         tail.rotate(joint_rot)
 
         bone: Bone = self.root.data.edit_bones.new(bone_name)
@@ -595,24 +603,30 @@ class RobotBuilder:
                             for visual in child_link.visuals:
                                 mesh_name, file_path, visual_pos, visual_rot, scale, material = self.get_link_data(
                                     child_pos, child_rot, child_link, visual)
-                                object = self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot, scale, self.link_pose[child_link.name][0], self.link_pose[child_link.name][1])
+                                object = self.add_mesh(mesh_name, material, file_path, visual_pos, visual_rot,
+                                                       scale, self.link_pose[child_link.name][0], self.link_pose[child_link.name][1])
                                 objects.append(object)
 
                             for object in objects:
                                 object.select_set(True)
-                            
+
                             if len(bpy.context.selected_objects) > 1:
-                                bpy.context.view_layer.objects.active = bpy.context.selected_objects[0]
+                                bpy.context.view_layer.objects.active = bpy.context.selected_objects[
+                                    0]
                                 bpy.ops.object.join()
 
-                            bone_name = child_joint.name + '.' + str(child_joint.type) + self.bone_tail
-                            self.add_bone(child_link, child_joint, joint_pos, joint_rot, bone_name)
-                            
+                            bone_name = child_joint.name + '.' + \
+                                str(child_joint.type) + self.bone_tail
+                            self.add_bone(child_link, child_joint,
+                                          joint_pos, joint_rot, bone_name)
+
                             objects[0].name = child_link.name
                             self.bind_mesh_to_bone(child_link.name, bone_name)
                         else:
-                            bone_name = child_joint.name + '.' + str(child_joint.type) + self.bone_tail
-                            self.add_bone(child_link, child_joint, child_pos, child_rot, bone_name)
+                            bone_name = child_joint.name + '.' + \
+                                str(child_joint.type) + self.bone_tail
+                            self.add_bone(child_link, child_joint,
+                                          child_pos, child_rot, bone_name)
 
                         self.parent_links.append(child_link)
 
