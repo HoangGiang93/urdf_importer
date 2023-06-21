@@ -355,7 +355,9 @@ class RobotBuilder:
                 bpy.ops.import_scene.obj(
                     filepath=file_path, axis_forward='Y', axis_up='Z')
             elif file_ext == '.stl':
-                bpy.ops.import_mesh.stl(filepath=file_path)
+                bpy.ops.import_mesh.stl(
+                    filepath=file_path, global_scale=1/self.scale_unit)
+
             else:
                 print('File extension', file_ext, 'of',
                       file_path, 'is not supported')
