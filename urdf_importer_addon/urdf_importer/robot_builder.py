@@ -364,6 +364,7 @@ class RobotBuilder:
                 (file_path, _) = fix_up_axis_and_get_materials(file_path, self.unique_name)
                 bpy.ops.wm.collada_import(filepath=file_path)
             elif file_ext == ".obj":
+                scale *= 1 / self.scale_unit
                 bpy.ops.import_scene.obj(filepath=file_path, axis_forward="Y", axis_up="Z")
             elif file_ext == ".stl":
                 bpy.ops.import_mesh.stl(filepath=file_path, global_scale=1 / self.scale_unit)
@@ -401,6 +402,13 @@ class RobotBuilder:
         object.location.rotate(rotation)
         object.location += location
         object.scale *= scale
+
+        selected_object = bpy.context.object
+        if selected_object.scale[0] * selected_object.scale[1] * selected_object.scale[2] < 0:
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.mesh.flip_normals()
+            bpy.ops.object.mode_set(mode="OBJECT")
 
         # Change origin of mesh to link_pos and link_rot
         bpy.context.scene.cursor.location = link_pos
