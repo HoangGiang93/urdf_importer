@@ -266,6 +266,7 @@ class RobotBuilder:
         scale_unit: float,
     ):
         xml_string = urdf_cleanup(file_path)
+        self.file_path = file_path
         self.robot: URDF = URDF.from_xml_string(xml_string)
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
         self.arm_bones: Dict[str, Bone] = {}
@@ -309,14 +310,24 @@ class RobotBuilder:
             visual: Visual
             for visual in link.visuals:
                 if hasattr(visual.geometry, "filename"):
-                    rel_path: str = visual.geometry.filename
-                    while os.path.dirname(rel_path) != "package:":
-                        rel_path = os.path.dirname(rel_path)
-                    pkg_name = os.path.basename(rel_path)
-                    pkg_path = rospkg.RosPack().get_path(pkg_name)
-                    abs_path = os.path.dirname(pkg_path) + visual.geometry.filename.replace("package://", "/")
-                    if os.path.exists(abs_path):
-                        visual.geometry.filename = abs_path
+                    if visual.geometry.filename.startswith("package:"):
+                        rel_path: str = visual.geometry.filename
+                        while os.path.dirname(rel_path) != "package:":
+                            rel_path = os.path.dirname(rel_path)
+                        pkg_name = os.path.basename(rel_path)
+                        pkg_path = rospkg.RosPack().get_path(pkg_name)
+                        abs_path = os.path.dirname(pkg_path) + visual.geometry.filename.replace("package://", "/")
+                    else:
+                        if visual.geometry.filename.startswith("file:///"):
+                            abs_path = visual.geometry.filename.replace("file://", "")
+                        elif visual.geometry.filename.startswith("file://"):
+                            abs_path = os.path.join(os.path.dirname(self.file_path), visual.geometry.filename.replace("file://", ""))
+                        else:
+                            raise NotImplementedError("File path " + rel_path + " is not supported")
+                    print(abs_path)
+                    if not os.path.exists(abs_path):
+                        raise FileNotFoundError("File " + abs_path + " does not exist")
+                    visual.geometry.filename = abs_path
         return None
 
     def add_root_armature(self) -> None:
