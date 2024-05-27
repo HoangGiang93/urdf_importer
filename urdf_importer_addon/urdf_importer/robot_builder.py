@@ -376,9 +376,9 @@ class RobotBuilder:
                 bpy.ops.wm.collada_import(filepath=file_path)
             elif file_ext == ".obj":
                 scale *= 1 / self.scale_unit
-                bpy.ops.import_scene.obj(filepath=file_path, axis_forward="Y", axis_up="Z")
+                bpy.ops.wm.obj_import(filepath=file_path, forward_axis="Y", up_axis="Z")
             elif file_ext == ".stl":
-                bpy.ops.import_mesh.stl(filepath=file_path, global_scale=1 / self.scale_unit)
+                bpy.ops.wm.stl_import(filepath=file_path, global_scale=1 / self.scale_unit)
 
             else:
                 print("File extension", file_ext, "of", file_path, "is not supported")
