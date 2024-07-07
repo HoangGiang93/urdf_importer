@@ -397,6 +397,11 @@ class RobotBuilder:
             object = bpy.context.object
             if self.apply_weld:
                 object.modifiers.new("Weld", "WELD")
+                # Modifiers cannot be applied to
+                # multi-user data, so we make it single.
+                bpy.ops.object.make_single_user(
+                    object=True, obdata=True, material=False,
+                    animation=False, obdata_animation=False)
                 bpy.ops.object.modifier_apply(modifier="Weld")
             if material is not None:
                 object.data.materials.append(material)
