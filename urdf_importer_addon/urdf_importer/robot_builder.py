@@ -6,7 +6,17 @@ from typing import Dict, List, Tuple, Union
 from xml.etree import ElementTree
 
 import bpy
-import rospkg
+ROS_PKG_VERSIONS = []
+try:
+    import rospkg
+    ROS_PKG_VERSIONS.append(1)
+except:
+    pass
+try:
+    from ament_index_python.packages import get_package_share_directory
+    ROS_PKG_VERSIONS.append(2)
+except:
+    pass
 from bpy.types import Armature, BlendData, Bone, Camera, Image, Light, Material, Mesh, Object
 from mathutils import Euler, Vector
 from urdf_parser_py.urdf import URDF, Joint, Link, Visual
@@ -153,6 +163,43 @@ def clear_data(data: BlendData, scale_unit: float) -> None:
     return None
 
 
+def get_from_ros_pkg(rel_path: str) -> str:
+    """
+    Use rospkg/ros2pkg to get the full path of a package.
+    Fall back to a local directory if both fail, if the local
+    directory does not exist fail completely.
+    """
+    pkg_name = os.path.basename(rel_path)
+
+    if 1 in ROS_PKG_VERSIONS:
+        try:
+            pkg_path = rospkg.RosPack().get_path(pkg_name)
+            if os.path.isdir(pkg_path):
+                return pkg_path
+        except rospkg.common.ResourceNotFound:
+            # we ignore that the package can not be found and assume
+            # its a ROS 2 package or local path
+            pass
+
+    if 2 in ROS_PKG_VERSIONS:
+        try:
+            pkg_path = get_package_share_directory(pkg_name)
+            if os.path.isdir(pkg_path):
+                return pkg_path
+        except ValueError:
+            # we ignore that the package can not be found and hope
+            # that it is a local path
+            pass
+    print(
+        'rospkg and rospkg2 not installed, or ROS package not installed '
+        'correctly, trying to use package name as relative path to the '
+        'urdf-file!')
+    if os.path.isdir(pkg_name):
+        return pkg_name
+    else:
+        raise RuntimeError('Can not resolve ros package %s', pkg_name)
+
+
 def merge_materials(should_check_material_name: bool) -> None:
     mat_uniques: List[Material] = []
     object: Object
@@ -287,7 +334,7 @@ class RobotBuilder:
     def build_robot(self) -> None:
         clear_data(bpy.data, self.scale_unit)
         self.create_materials()
-        self.konfigure_mesh_path()
+        self.configure_mesh_path()
         self.add_root_armature()
         self.build_root()
         self.build_chain()
@@ -304,7 +351,7 @@ class RobotBuilder:
                     mat.diffuse_color = material.color.rgba
         return None
 
-    def konfigure_mesh_path(self) -> None:
+    def configure_mesh_path(self) -> None:
         link: Link
         for link in self.robot.links:
             visual: Visual
@@ -314,8 +361,7 @@ class RobotBuilder:
                         rel_path: str = visual.geometry.filename
                         while os.path.dirname(rel_path) != "package:":
                             rel_path = os.path.dirname(rel_path)
-                        pkg_name = os.path.basename(rel_path)
-                        pkg_path = rospkg.RosPack().get_path(pkg_name)
+                        pkg_path = get_from_ros_pkg(rel_path)
                         abs_path = os.path.dirname(pkg_path) + visual.geometry.filename.replace("package://", "/")
                     else:
                         if visual.geometry.filename.startswith("file:///"):
