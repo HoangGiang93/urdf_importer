@@ -421,7 +421,6 @@ class RobotBuilder:
                 (file_path, _) = fix_up_axis_and_get_materials(file_path, self.unique_name)
                 bpy.ops.wm.collada_import(filepath=file_path)
             elif file_ext == ".obj":
-                scale *= 1 / self.scale_unit
                 if "obj_import" in dir(bpy.ops.wm):
                     bpy.ops.wm.obj_import(filepath=file_path, up_axis='Z', forward_axis='Y', global_scale=1 / self.scale_unit)
                 elif "obj" in dir(bpy.ops.import_mesh):
