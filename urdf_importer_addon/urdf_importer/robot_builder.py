@@ -1,5 +1,12 @@
 #!/usr/bin/python3
 
+import sys
+
+# Avoid ROS packages interfering, e.g. urdf_parser_py
+ros_path = [p for p in sys.path if p.startswith("/opt/ros")]
+sys.path = [p for p in sys.path if not p.startswith("/opt/ros")]
+sys.path = sys.path + ros_path
+
 import os
 from shutil import copy
 from typing import Dict, List, Tuple, Union
@@ -311,10 +318,14 @@ class RobotBuilder:
         should_apply_weld: bool,
         unique_name: bool,
         scale_unit: float,
+        ignore_root: bool,
     ):
         xml_string = urdf_cleanup(file_path)
         self.file_path = file_path
         self.robot: URDF = URDF.from_xml_string(xml_string)
+        self.robot_root_name = self.robot.get_root()
+        if ignore_root:
+            self.remove_root_link()
         self.link_pose: Dict[str, Tuple[Vector, Euler]] = {}
         self.arm_bones: Dict[str, Bone] = {}
         self.root: Object = None
@@ -324,12 +335,31 @@ class RobotBuilder:
         self.apply_weld = should_apply_weld
         self.unique_name = unique_name
         self.scale_unit = scale_unit
+        self.ignore_root = ignore_root
         self.build_robot()
         if should_merge_duplicate_materials:
             merge_materials(should_check_material_name)
         if should_rename_materials:
             rename_materials(self.robot.name)
         clean_up()
+
+    def remove_root_link(self) -> None:
+        def parent_name(j):
+            return getattr(j.parent, "link", j.parent)
+
+        root_joints = [j for j in self.robot.joints if parent_name(j) == self.robot_root_name]
+        if len(root_joints) != 1:
+            print(
+                f"Expected exactly one child joint of root '{self.robot_root_name}', "
+                f"found {len(root_joints)}."
+            )
+            return
+
+        root_joint = root_joints[0]
+        links = [l for l in self.robot.links if l.name != self.robot_root_name]
+        self.robot.links = links
+        self.robot.joints = [j for j in self.robot.joints if j.name != root_joint.name]
+        self.robot_root_name = links[0].name
 
     def build_robot(self) -> None:
         clear_data(bpy.data, self.scale_unit)
@@ -597,7 +627,7 @@ class RobotBuilder:
         bone.head = head
         bone.tail = head + tail
 
-        if self.robot.parent_map[link.name][1] == self.robot.get_root():
+        if self.robot.parent_map[link.name][1] == self.robot_root_name:
             bone.parent = self.root.data.edit_bones["root" + self.bone_tail]
         else:
             parent_joint = self.robot.parent_map[self.robot.parent_map[link.name][1]][0]
@@ -608,7 +638,7 @@ class RobotBuilder:
         return None
 
     def build_root(self) -> None:
-        root_link: Link = self.robot.link_map[self.robot.get_root()]
+        root_link: Link = self.robot.link_map[self.robot_root_name]
         self.link_pose[root_link.name] = (Vector(), Euler())
         self.set_link_origin(root_link)
 
@@ -662,6 +692,8 @@ class RobotBuilder:
 
     def build_chain(self) -> None:
         while self.robot.child_map:
+            if self.ignore_root and len(self.robot.child_map) == 1:
+                break
             # Make new parent links
             links = self.parent_links
 
