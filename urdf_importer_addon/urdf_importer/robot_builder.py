@@ -605,10 +605,12 @@ class RobotBuilder:
         object = bpy.context.scene.objects.get(mesh_name)
         object.select_set(True)
         self.arm_bones.active = self.arm_bones[bone_name]
-        self.arm_bones[bone_name].select = True
+        if bpy.app.version < (5, 0, 0):
+            self.arm_bones[bone_name].select = True
         bpy.ops.object.parent_set(type="BONE")
         object.select_set(False)
-        self.arm_bones[bone_name].select = False
+        if bpy.app.version < (5, 0, 0):
+            self.arm_bones[bone_name].select = False
 
         bpy.ops.object.mode_set(mode="OBJECT")
         return None
