@@ -3,9 +3,11 @@
 import sys
 
 # Avoid ROS packages interfering, e.g. urdf_parser_py
-ros_path = [p for p in sys.path if p.startswith("/opt/ros")]
-sys.path = [p for p in sys.path if not p.startswith("/opt/ros")]
-sys.path = sys.path + ros_path
+ros_path = glob.glob("/opt/ros/*/lib/*/site-packages")
+
+if ros_path not in sys.path:
+    sys.path.extend(ros_path)
+
 
 import os
 from shutil import copy
