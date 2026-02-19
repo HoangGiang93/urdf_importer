@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import sys
+import glob
 
 # Avoid ROS packages interfering, e.g. urdf_parser_py
 ros_path = glob.glob("/opt/ros/*/lib/*/site-packages")
